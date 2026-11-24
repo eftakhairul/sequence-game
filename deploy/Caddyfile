@@ -1,0 +1,6 @@
+# Alternative to nginx: Caddy obtains and renews HTTPS certificates automatically.
+# /etc/caddy/Caddyfile — replace the domain, then: sudo systemctl reload caddy
+play.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:3001
+}
