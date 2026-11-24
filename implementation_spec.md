@@ -392,14 +392,14 @@ Every event payload has a zod schema, and both server and client import the type
 | C→S | `room:rematch` | `{}` | host; finished only |
 | C→S | `game:action` | `Action` without `timeout` | `{ ok }` or a `RuleError` code |
 | C→S | `chat:send` | `{ text }` | |
-| S→C | `room:state` | `{ code, hostId, config, seats, phase, you: playerId, turnDeadline }` | sent on any lobby/seat/connection change |
-| S→C | `game:update` | `{ view: PlayerView, events: GameEvent[], turnDeadline }` | per seat |
+| S→C | `room:state` | `{ code, hostId, config, seats, phase, you: playerId, turnDeadline, waiting, serverNow }` | sent on any lobby/seat/connection change; `waiting` = unseated members, `serverNow` = server clock (see `docs/decisions.md`) |
+| S→C | `game:update` | `{ view: PlayerView, events: GameEvent[], turnDeadline, serverNow }` | per seat |
 | S→C | `chat:message` | `{ id, playerId, name, text, at }` | |
 | S→C | `chat:history` | `ChatMessage[]` | sent on join/reconnect |
 | S→C | `error` | `{ code, message? }` | non-ack errors |
 | S→C | `server:shutdown` | `{}` | |
 
-Server-side error codes beyond `RuleError`: `BAD_REQUEST`, `RATE_LIMITED`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `NOT_HOST`, `NOT_IN_ROOM`, `WRONG_PHASE`, `SEATS_NOT_FILLED`, `SEAT_TAKEN`.
+Server-side error codes beyond `RuleError`: `BAD_REQUEST`, `RATE_LIMITED`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `NOT_HOST`, `NOT_IN_ROOM`, `WRONG_PHASE`, `SEATS_NOT_FILLED`, `SEAT_TAKEN`, `INTERNAL` (unexpected failure).
 
 ---
 

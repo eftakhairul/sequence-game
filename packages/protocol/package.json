@@ -1,0 +1,28 @@
+{
+  "name": "@lineup/protocol",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "zod schemas and TS types for every Socket.IO event.",
+  "exports": {
+    ".": {
+      "@lineup/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lineup/rules": "workspace:*",
+    "@lineup/shared-config": "workspace:*",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
