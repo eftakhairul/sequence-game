@@ -6,7 +6,7 @@ import { GameView } from '../components/GameView';
 import { Lobby } from '../components/Lobby';
 import { Shell } from '../components/Shell';
 import { act, getSocket, request, storage } from '../socket';
-import { resetRoom, useStore } from '../store';
+import { resetRoom, setUi, useStore } from '../store';
 import { errorText } from '../text';
 import { NameField, validName } from './Home';
 
@@ -20,17 +20,21 @@ export function Room() {
   const chat = useStore((s) => s.chat);
   const connection = useStore((s) => s.connection);
   const joinedFor = useRef<string | null>(null);
+  const removed = useStore((s) => s.ui.removedFrom === code);
 
   // Join (and re-join after every reconnect, which also covers a server restart).
   useEffect(() => {
     if (!hasName) return;
     const socket = getSocket();
     const join = async () => {
+      // Never rejoin a room the host removed us from (e.g. after a reconnect).
+      if (useStore.getState().ui.removedFrom === code) return;
       const res = await request('room:join', {
         code,
         name: storage.get(STORAGE_KEYS.name) ?? name,
       });
-      if (!res.ok)
+      if (!res.ok && res.code === 'KICKED') setUi({ removedFrom: code });
+      else if (!res.ok)
         setJoinError(
           res.code === 'ROOM_NOT_FOUND' ? 'ROOM_NOT_FOUND' : errorText(res.code, res.message),
         );
@@ -71,6 +75,24 @@ export function Room() {
             Join
           </button>
         </form>
+      </Shell>
+    );
+  }
+
+  if (removed) {
+    return (
+      <Shell code={code}>
+        <div
+          className="panel mx-auto mt-8 max-w-md space-y-3 p-5 text-center"
+          role="alert"
+          data-testid="removed"
+        >
+          <h1 className="text-xl font-bold">You were removed</h1>
+          <p className="text-[var(--muted)]">The host removed you from room {code}.</p>
+          <Link className="btn btn-primary" to="/">
+            Back to home
+          </Link>
+        </div>
       </Shell>
     );
   }
@@ -125,6 +147,10 @@ export function Room() {
             <Chat messages={chat} me={room.you} onSend={sendChat} className="max-h-80" />
           </div>
         </>
+      ) : seated && !view ? (
+        <p className="p-6 text-center text-[var(--muted)]" role="status">
+          Loading game…
+        </p>
       ) : seated && view ? (
         <GameView
           room={room}

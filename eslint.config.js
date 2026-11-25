@@ -42,14 +42,10 @@ export default tseslint.config(
     files: ['packages/rules/src/**/*.ts'],
     languageOptions: { globals: {} },
     rules: {
-      'no-restricted-globals': [
+      'no-restricted-globals': ['error', 'process', 'window', 'document', 'setTimeout', 'Date'],
+      'no-restricted-properties': [
         'error',
-        'process',
-        'window',
-        'document',
-        'setTimeout',
-        'Date',
-        'Math.random',
+        { object: 'Math', property: 'random', message: 'Use the seeded RNG in rng.ts.' },
       ],
       'no-restricted-imports': ['error', { patterns: ['node:*', 'fs', 'path'] }],
     },

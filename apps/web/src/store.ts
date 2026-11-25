@@ -26,6 +26,8 @@ export interface StoreState {
     announcement: string;
     toast: { id: number; text: string } | null;
     shutdown: boolean;
+    /** code of a room the host removed this player from (stops auto-rejoin) */
+    removedFrom: string | null;
   };
 }
 
@@ -36,7 +38,14 @@ export const initialState: StoreState = {
   game: { view: null, lastEvents: [], turnDeadline: null, clockOffset: 0, seq: 0 },
   chat: [],
   log: [],
-  ui: { selectedCard: null, previewCell: null, announcement: '', toast: null, shutdown: false },
+  ui: {
+    selectedCard: null,
+    previewCell: null,
+    announcement: '',
+    toast: null,
+    shutdown: false,
+    removedFrom: null,
+  },
 };
 
 export const useStore = create<StoreState>(() => initialState);

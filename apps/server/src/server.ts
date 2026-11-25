@@ -56,6 +56,8 @@ export interface Room {
   lastActivity: number;
   /** Everyone in the room (seated or waiting), with their display name. Server-only. */
   members: Map<string, { name: string }>;
+  /** Players the host removed; they cannot rejoin this room. Server-only. */
+  kicked: Set<string>;
   /** playerId → connected socket ids in this room. Server-only. */
   sockets: Map<string, Set<string>>;
   timer: NodeJS.Timeout | null;
@@ -134,7 +136,7 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
       );
       return;
     }
-    if (req.url?.startsWith('/socket.io')) return; // handled by Socket.IO
+    if (req.url?.startsWith('/socket.io/')) return; // handled by Socket.IO
     if (!serveStatic(req, res)) {
       res.writeHead(405, SECURITY_HEADERS).end();
     }
@@ -168,9 +170,12 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
 
   function clientIp(socket: IoSocket): string {
     if (config.trustProxy) {
+      // The trusted proxy APPENDS the address it saw, so only the last entry is reliable;
+      // earlier entries come from the client and can be forged.
       const xff = socket.handshake.headers['x-forwarded-for'];
-      const first = (Array.isArray(xff) ? xff[0] : xff)?.split(',')[0]?.trim();
-      if (first) return first;
+      const joined = Array.isArray(xff) ? xff.join(',') : xff;
+      const last = joined?.split(',').at(-1)?.trim();
+      if (last) return last;
     }
     return socket.handshake.address;
   }
@@ -230,8 +235,21 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
     };
   }
 
+  /**
+   * Makes sure the room has a reachable host: if the host is no longer a member, or is
+   * disconnected with no grace period pending, the role passes to a connected member. Runs on
+   * every state broadcast, so a room whose host left while nobody else was online recovers as
+   * soon as someone reconnects.
+   */
+  function ensureHost(room: Room): void {
+    const present = room.members.has(room.hostId) && isConnected(room, room.hostId);
+    if (present || (room.members.has(room.hostId) && room.hostTimer)) return;
+    pickNewHost(room);
+  }
+
   function emitRoomState(room: Room): void {
     refreshConnected(room);
+    ensureHost(room);
     for (const playerId of room.sockets.keys()) {
       for (const sid of room.sockets.get(playerId) ?? []) {
         io.to(sid).emit('room:state', roomStateFor(room, playerId));
@@ -260,6 +278,12 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
       if (!s) return;
       for (const sid of room.sockets.get(s.playerId) ?? []) sendTo(sid, seat);
     });
+  }
+
+  /** True if `socket` is already in the room or the room has space for one more socket. */
+  function hasSocketRoom(room: Room, socket: IoSocket): boolean {
+    if (room.sockets.get(socket.data.playerId)?.has(socket.id)) return true;
+    return socketCount(room) < MAX_SOCKETS_PER_ROOM;
   }
 
   function attachSocket(room: Room, socket: IoSocket): void {
@@ -416,10 +440,11 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
 
   function joinRoom(room: Room, session: Session, socket: IoSocket, name: string): void {
     const id = session.playerId;
+    if (room.kicked.has(id))
+      throw new ClientError('KICKED', 'The host removed you from this room.');
+    // The cap counts sockets, so it applies to extra tabs of existing members too.
+    if (!hasSocketRoom(room, socket)) throw new ClientError('ROOM_FULL');
     if (session.roomCode && session.roomCode !== room.code) leaveRoom(session, true);
-    const alreadyMember = room.members.has(id);
-    if (!alreadyMember && socketCount(room) >= MAX_SOCKETS_PER_ROOM)
-      throw new ClientError('ROOM_FULL');
     session.name = name;
     session.roomCode = room.code;
     room.members.set(id, { name });
@@ -457,6 +482,7 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
         chat: [],
         lastActivity: Date.now(),
         members: new Map(),
+        kicked: new Set(),
         sockets: new Map(),
         timer: null,
         hostTimer: null,
@@ -534,10 +560,11 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
       if (playerId === session.playerId || !room.members.has(playerId)) {
         throw new ClientError('BAD_REQUEST', 'Cannot kick that player');
       }
+      room.kicked.add(playerId);
       for (const sid of room.sockets.get(playerId) ?? []) {
         io.to(sid).emit('error', {
-          code: 'NOT_IN_ROOM',
-          message: 'You were removed from the room by the host.',
+          code: 'KICKED',
+          message: 'The host removed you from this room.',
         });
       }
       const target = sessionsById.get(playerId);
@@ -685,7 +712,9 @@ export function createGameServer(config: ServerConfig, log: Logger): GameServer 
 
     // Reconnect: re-attach to the player's room.
     const room = session.roomCode ? rooms.get(session.roomCode) : undefined;
-    if (room && room.members.has(session.playerId)) {
+    if (room && room.members.has(session.playerId) && !hasSocketRoom(room, socket)) {
+      socket.emit('error', { code: 'ROOM_FULL', message: 'Too many connections to this room.' });
+    } else if (room && room.members.has(session.playerId)) {
       attachSocket(room, socket);
       if (room.hostTimer && room.hostId === session.playerId) {
         clearTimeout(room.hostTimer);

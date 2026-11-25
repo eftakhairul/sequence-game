@@ -76,9 +76,10 @@ export function getSocket(): AppSocket {
   s.on('chat:history', (chat) => useStore.setState({ chat }));
   s.on('chat:message', (m) => useStore.setState((st) => ({ chat: [...st.chat, m].slice(-100) })));
   s.on('error', ({ code, message }) => {
-    if (code === 'NOT_IN_ROOM' && message) {
+    if (code === 'KICKED') {
+      const removedFrom = useStore.getState().room?.code ?? null;
       resetRoom();
-      setUi({ announcement: message });
+      setUi({ removedFrom, announcement: errorText(code, message) });
     }
     showToast(errorText(code, message));
   });

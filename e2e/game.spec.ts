@@ -247,3 +247,16 @@ test("9. security: received frames never contain another seat's hand", async ({ 
   expect(await handCards(guest)).toEqual(lastView.hand);
   expect(BOARD).toHaveLength(100);
 });
+
+test('10. a kicked player sees a removed screen and is not auto-rejoined', async ({ browser }) => {
+  const host = await newPlayer(browser);
+  const guest = await newPlayer(browser);
+  const url = await createRoom(host, 'Alice', 2);
+  await joinByLink(guest, url, 'Bob');
+  await host.getByRole('button', { name: 'Kick Bob' }).click();
+  await expect(guest.getByTestId('removed')).toBeVisible();
+  await expect(host.locator('[data-seat="1"]')).toContainText('Sit here');
+  await guest.reload();
+  await expect(guest.getByTestId('removed')).toBeVisible();
+  await expect(host.locator('[data-seat="1"]')).toContainText('Sit here');
+});

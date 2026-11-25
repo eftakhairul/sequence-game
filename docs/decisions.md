@@ -103,3 +103,17 @@ Newest entries at the bottom.
   on the server.
 - Accessibility (`@axe-core/playwright`) runs on the lobby and on the 2- and 6-player game views; no
   serious/critical violations are allowed.
+
+## Review fixes (PR #1)
+
+- **`TRUST_PROXY`** uses the **last** `X-Forwarded-For` entry (the one the trusted proxy appended);
+  earlier entries are client-supplied and could be forged to dodge per-IP limits.
+- **Kicks are sticky.** A kicked player is recorded on the room (`kicked`) and `room:join` returns the
+  new error code `KICKED` for the rest of the room's life. The kicked client shows a "You were
+  removed" screen and stops auto-rejoining on reconnect.
+- **Host recovery.** Every room-state broadcast checks the host: if the host is no longer a member, or
+  is disconnected with no grace period pending, the role passes to a connected member. A room whose
+  host left while nobody else was online gets a host as soon as someone reconnects.
+- **Socket cap** (20 per room) is checked for every socket that attaches, including extra tabs of
+  existing members and reconnects; over the cap the socket gets `ROOM_FULL`.
+- Only `/socket.io/` (with the slash) is left to Socket.IO; other paths get normal HTTP responses.

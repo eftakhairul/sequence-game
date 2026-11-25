@@ -383,7 +383,7 @@ Every event payload has a zod schema, and both server and client import the type
 |---|---|---|---|
 | S→C | `session:init` | `{ playerId, token }` | sent on connect when a new session was created |
 | C→S | `room:create` | `{ name }` | `{ ok, code }` |
-| C→S | `room:join` | `{ code, name }` | `{ ok }` or `ROOM_NOT_FOUND` / `ROOM_FULL` |
+| C→S | `room:join` | `{ code, name }` | `{ ok }` or `ROOM_NOT_FOUND` / `ROOM_FULL` / `KICKED` |
 | C→S | `room:leave` | `{}` | frees the seat in lobby; during play the seat stays held (disconnected) |
 | C→S | `room:seat` | `{ seat: number \| null }` | lobby only; `null` = stand up |
 | C→S | `room:config` | `Partial<GameConfig>` | host + lobby only |
@@ -399,7 +399,7 @@ Every event payload has a zod schema, and both server and client import the type
 | S→C | `error` | `{ code, message? }` | non-ack errors |
 | S→C | `server:shutdown` | `{}` | |
 
-Server-side error codes beyond `RuleError`: `BAD_REQUEST`, `RATE_LIMITED`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `NOT_HOST`, `NOT_IN_ROOM`, `WRONG_PHASE`, `SEATS_NOT_FILLED`, `SEAT_TAKEN`, `INTERNAL` (unexpected failure).
+Server-side error codes beyond `RuleError`: `BAD_REQUEST`, `RATE_LIMITED`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `NOT_HOST`, `NOT_IN_ROOM`, `WRONG_PHASE`, `SEATS_NOT_FILLED`, `SEAT_TAKEN`, `KICKED` (the host removed this player; they cannot rejoin that room), `INTERNAL` (unexpected failure).
 
 ---
 

@@ -224,6 +224,7 @@ export type ServerErrorCode =
   | 'WRONG_PHASE'
   | 'SEATS_NOT_FILLED'
   | 'SEAT_TAKEN'
+  | 'KICKED'
   | 'INTERNAL';
 export type ErrorCode = ServerErrorCode | RuleError;
 

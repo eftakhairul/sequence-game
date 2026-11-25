@@ -17,6 +17,7 @@ const ERROR_TEXT: Partial<Record<ErrorCode, string>> = {
   ROOM_FULL: 'That room is full.',
   NOT_HOST: 'Only the host can do that.',
   NOT_IN_ROOM: 'You are not in this room.',
+  KICKED: 'The host removed you from this room.',
   WRONG_PHASE: 'You cannot do that right now.',
   SEATS_NOT_FILLED: 'Every seat must be filled before starting.',
   SEAT_TAKEN: 'That seat was just taken.',

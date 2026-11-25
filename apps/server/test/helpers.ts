@@ -38,13 +38,18 @@ export async function startServer(
   return Object.assign(server, { url: `http://127.0.0.1:${server.port()}` });
 }
 
-export function connect(url: string, token?: string): Promise<Client> {
+export function connect(
+  url: string,
+  token?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<Client> {
   return new Promise((resolve, reject) => {
     const socket = ioc(url, {
       auth: token ? { token } : {},
       transports: ['websocket'],
       forceNew: true,
       reconnection: false,
+      extraHeaders,
     }) as Client;
     socket.states = [];
     socket.updates = [];

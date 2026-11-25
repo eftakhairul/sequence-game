@@ -147,7 +147,7 @@ describe('rooms', () => {
       code: 'BAD_REQUEST',
     });
     expect(await call(a, 'room:kick', { playerId: b.playerId })).toEqual({ ok: true });
-    await waitFor(() => b.errors.some((e) => e.code === 'NOT_IN_ROOM'));
+    await waitFor(() => b.errors.some((e) => e.code === 'KICKED'));
     await waitFor(() => lastState(a).waiting.length === 0);
     expect(await call(b, 'room:seat', { seat: 1 })).toEqual({ ok: false, code: 'NOT_IN_ROOM' });
   });
@@ -381,5 +381,85 @@ describe('http', () => {
     expect(() => loadConfig({ TEST_MODE: '1', NODE_ENV: 'production' })).toThrow(/TEST_MODE/);
     expect(loadConfig({ PORT: '4000' }).port).toBe(4000);
     expect(loadConfig({}).webDist).toMatch(/web[/\\]dist$/);
+  });
+});
+
+describe('review fixes', () => {
+  it('kicked players cannot rejoin the room', async () => {
+    const { a, b, code } = await twoPlayerRoom();
+    expect(await call(a, 'room:kick', { playerId: b.playerId })).toEqual({ ok: true });
+    await waitFor(() => b.errors.some((e) => e.code === 'KICKED'));
+    expect(await call(b, 'room:join', { code, name: 'Bob' })).toMatchObject({
+      ok: false,
+      code: 'KICKED',
+    });
+    // a reconnect does not re-attach them either
+    b.disconnect();
+    const b2 = await client(b.token);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(b2.states).toHaveLength(0);
+    expect(lastState(a).waiting).toHaveLength(0);
+  });
+
+  it('a room whose host left while nobody was online gets a new host on reconnect', async () => {
+    const { a, b } = await twoPlayerRoom();
+    b.disconnect();
+    await waitFor(() => lastState(a).seats[1]?.connected === false);
+    expect(await call(a, 'room:leave')).toEqual({ ok: true });
+    const b2 = await client(b.token);
+    await waitFor(() => b2.states.length > 0);
+    expect(lastState(b2).hostId).toBe(b.playerId);
+    expect(await call(b2, 'room:config', { playerCount: 4 })).toEqual({ ok: true });
+  });
+
+  it('a host whose grace period expired with nobody online is replaced later', async () => {
+    const { a, b } = await twoPlayerRoom();
+    b.disconnect();
+    await waitFor(() => lastState(a).seats[1]?.connected === false);
+    a.disconnect();
+    await new Promise((r) => setTimeout(r, 400)); // > hostGraceMs (200)
+    const b2 = await client(b.token);
+    await waitFor(() => b2.states.length > 0);
+    expect(lastState(b2).hostId).toBe(b.playerId);
+  });
+
+  it('the 20-socket cap also applies to extra connections of existing members', async () => {
+    const { a, code } = await twoPlayerRoom();
+    const extra: Client[] = [];
+    let full = false;
+    for (let i = 0; i < 25 && !full; i++) {
+      const c = await client(a.token);
+      extra.push(c);
+      const res = await call(c, 'room:join', { code, name: 'Alice' });
+      if (!res.ok && res.code === 'ROOM_FULL') full = true;
+    }
+    expect(full).toBe(true);
+    const room = server.rooms.get(code);
+    const total = [...(room?.sockets.values() ?? [])].reduce((n, s) => n + s.size, 0);
+    expect(total).toBeLessThanOrEqual(20);
+    // reconnecting with a full room is refused too
+    const more = await client(a.token);
+    await waitFor(() => more.errors.some((e) => e.code === 'ROOM_FULL'));
+  });
+
+  it('uses the last X-Forwarded-For entry when trusting the proxy', async () => {
+    await server.close();
+    server = await startServer({ trustProxy: true });
+    const results = [];
+    for (let i = 0; i < 6; i++) {
+      // forged first entry, real proxy-added address last
+      const c = await connect(server.url, undefined, {
+        'x-forwarded-for': `10.9.9.${i}, 203.0.113.7`,
+      });
+      clients.push(c);
+      results.push(await call(c, 'room:create', { name: 'A' }));
+    }
+    expect(results.slice(0, 5).every((r) => r.ok)).toBe(true);
+    expect(results[5]).toMatchObject({ ok: false, code: 'RATE_LIMITED' });
+  });
+
+  it('answers non-Socket.IO paths that start with /socket.io', async () => {
+    const res = await fetch(`${server.url}/socket.iox`, { signal: AbortSignal.timeout(2000) });
+    expect(res.status).toBe(404);
   });
 });
