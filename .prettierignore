@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+test-results
+playwright-report
+packages/rules/src/boardLayout.ts
+implementation_spec.md

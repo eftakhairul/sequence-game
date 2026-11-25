@@ -1,0 +1,17 @@
+# docker compose up -d --build
+# The app listens on 127.0.0.1:3001; put nginx/Caddy in front for HTTPS (see README).
+services:
+  lineup:
+    build: .
+    image: lineup:latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3001:3001'
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      # Set to 1 when running behind a reverse proxy so rate limits see real client IPs.
+      TRUST_PROXY: '1'
+    stop_grace_period: 10s

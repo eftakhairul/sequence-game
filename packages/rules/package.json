@@ -1,0 +1,25 @@
+{
+  "name": "@lineup/rules",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, deterministic rules engine for Lineup. Zero runtime dependencies.",
+  "exports": {
+    ".": {
+      "@lineup/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "fast-check": "^4.3.0",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
